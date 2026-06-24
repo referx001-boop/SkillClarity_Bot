@@ -43,7 +43,7 @@ async function fetchArbeitnowJobs() {
     });
 
     const jobs = res.data.data || [];
-    const cutoff = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000; // 24 hours ago
 
     return jobs
       .filter((job) => {
