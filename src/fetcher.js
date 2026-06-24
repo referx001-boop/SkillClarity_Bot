@@ -2,7 +2,6 @@ const axios = require("axios");
 
 const postedJobIds = new Set();
 
-// Only accept English jobs
 function isEnglish(text) {
   if (!text) return true;
   const germanWords = [
@@ -38,6 +37,10 @@ async function fetchRemotiveJobs() {
     const res = await axios.get("https://remotive.com/api/remote-jobs", {
       params: { limit: 100 },
       timeout: 10000,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
     });
 
     const jobs = res.data.jobs || [];
@@ -70,6 +73,10 @@ async function fetchArbeitnowJobs() {
   try {
     const res = await axios.get("https://www.arbeitnow.com/api/job-board-api", {
       timeout: 10000,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
     });
 
     const jobs = res.data.data || [];
@@ -110,8 +117,12 @@ async function fetchArbeitnowJobs() {
 async function fetchHimalayasJobs() {
   try {
     const res = await axios.get("https://himalayas.app/jobs/api", {
-      params: { limit: 100 },
+      params: { limit: 20 },
       timeout: 10000,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
     });
 
     const jobs = res.data.jobs || [];
@@ -147,6 +158,10 @@ async function fetchTheMuseJobs() {
     const res = await axios.get("https://www.themuse.com/api/public/jobs", {
       params: { page: 0, descended: true },
       timeout: 10000,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
     });
 
     const jobs = res.data.results || [];
@@ -175,44 +190,13 @@ async function fetchTheMuseJobs() {
   }
 }
 
-async function fetchWeWorkRemotelyJobs() {
-  try {
-    const res = await axios.get("https://weworkremotely.com/remote-jobs.json", {
-      timeout: 10000,
-    });
-
-    const jobs = res.data || [];
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-
-    return jobs
-      .filter((job) => {
-        const posted = new Date(job.created_at).getTime();
-        return posted >= cutoff && !postedJobIds.has(`wwr-${job.id}`);
-      })
-      .map((job) => ({
-        id: `wwr-${job.id}`,
-        title: job.title,
-        company: job.company,
-        location: "Remote",
-        salary: null,
-        tags: job.category ? [job.category] : [],
-        description: job.description?.slice(0, 300) || "",
-        url: `https://weworkremotely.com${job.url}`,
-        source: "We Work Remotely",
-        postedAt: job.created_at,
-      }));
-  } catch (err) {
-    console.error("[WeWorkRemotely] Fetch error:", err.message);
-    return [];
-  }
-}
-
 async function fetchRemoteOKJobs() {
   try {
     const res = await axios.get("https://remoteok.com/api", {
       timeout: 10000,
       headers: {
-        "User-Agent": "SkillClarity Jobs Bot",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       },
     });
 
@@ -242,49 +226,60 @@ async function fetchRemoteOKJobs() {
   }
 }
 
-async function fetchJobspressJobs() {
+async function fetchJobicyJobs() {
   try {
-    const res = await axios.get(
-      "https://jobspress.io/api/jobs?remote=true&limit=50",
-      { timeout: 10000 },
-    );
+    const res = await axios.get("https://jobicy.com/api/v2/remote-jobs", {
+      params: { count: 50 },
+      timeout: 10000,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
 
-    const jobs = res.data.jobs || res.data || [];
+    const jobs = res.data.jobs || [];
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
 
     return jobs
       .filter((job) => {
-        const posted = new Date(job.created_at || job.postedAt).getTime();
-        return posted >= cutoff && !postedJobIds.has(`jobspress-${job.id}`);
+        const posted = new Date(job.pubDate).getTime();
+        return posted >= cutoff && !postedJobIds.has(`jobicy-${job.id}`);
       })
       .map((job) => ({
-        id: `jobspress-${job.id}`,
-        title: job.title,
-        company: job.company || "Unknown",
+        id: `jobicy-${job.id}`,
+        title: job.jobTitle,
+        company: job.companyName,
         location: "Remote",
-        salary: job.salary || null,
-        tags: job.tags || [],
-        description: job.description?.slice(0, 300) || "",
-        url: job.url || job.apply_url,
-        source: "JobsPress",
-        postedAt: job.created_at || job.postedAt,
+        salary: job.annualSalaryMin
+          ? `${job.annualSalaryMin} - ${job.annualSalaryMax} ${job.salaryCurrency}`
+          : null,
+        tags: job.jobIndustry || [],
+        description: job.jobExcerpt?.slice(0, 300) || "",
+        url: job.url,
+        source: "Jobicy",
+        postedAt: job.pubDate,
       }));
   } catch (err) {
-    console.error("[JobsPress] Fetch error:", err.message);
+    console.error("[Jobicy] Fetch error:", err.message);
     return [];
   }
 }
 
 async function fetchAllJobs() {
-  const [remotive, arbeitnow, himalayas, themuse, wwr, remoteok, jobspress] =
+  // Clear cache once it hits 500 so jobs recirculate
+  if (postedJobIds.size > 500) {
+    postedJobIds.clear();
+    console.log("[Cache] Cleared posted jobs cache");
+  }
+
+  const [remotive, arbeitnow, himalayas, themuse, remoteok, jobicy] =
     await Promise.all([
       fetchRemotiveJobs(),
       fetchArbeitnowJobs(),
       fetchHimalayasJobs(),
       fetchTheMuseJobs(),
-      fetchWeWorkRemotelyJobs(),
       fetchRemoteOKJobs(),
-      fetchJobspressJobs(),
+      fetchJobicyJobs(),
     ]);
 
   const allJobs = [
@@ -292,17 +287,15 @@ async function fetchAllJobs() {
     ...arbeitnow,
     ...himalayas,
     ...themuse,
-    ...wwr,
     ...remoteok,
-    ...jobspress,
+    ...jobicy,
   ];
 
   allJobs.forEach((job) => postedJobIds.add(job.id));
 
-  if (postedJobIds.size > 5000) {
-    const entries = [...postedJobIds];
-    entries.slice(0, 1000).forEach((id) => postedJobIds.delete(id));
-  }
+  console.log(
+    `[Sources] Remotive:${remotive.length} Arbeitnow:${arbeitnow.length} Himalayas:${himalayas.length} TheMuse:${themuse.length} RemoteOK:${remoteok.length} Jobicy:${jobicy.length}`,
+  );
 
   return allJobs;
 }
