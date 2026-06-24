@@ -49,7 +49,7 @@ async function postJobs() {
       }
 
       await bot.telegram.sendMessage(CHANNEL_ID, message, options);
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 3000));
     } catch (err) {
       console.error(`[Post error] ${job.title}:`, err.message);
     }
