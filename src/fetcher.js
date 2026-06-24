@@ -10,7 +10,7 @@ async function fetchRemotiveJobs() {
     });
 
     const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000; // 6 hours ago
 
     return jobs
       .filter((job) => {
@@ -42,7 +42,7 @@ async function fetchArbeitnowJobs() {
     });
 
     const jobs = res.data.data || [];
-    const cutoff = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000; // 6 hours ago
 
     return jobs
       .filter((job) => {
@@ -75,7 +75,7 @@ async function fetchHimalayasJobs() {
     });
 
     const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000; // 6 hours ago
 
     return jobs
       .filter((job) => {
@@ -110,7 +110,7 @@ async function fetchTheMuseJobs() {
     });
 
     const jobs = res.data.results || [];
-    const cutoff = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000; // 6 hours ago
 
     return jobs
       .filter((job) => {
