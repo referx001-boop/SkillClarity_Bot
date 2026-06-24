@@ -54,7 +54,7 @@ async function postJobs() {
   }
 }
 
-cron.schedule("*/15 * * * *", postJobs);
+cron.schedule("*/2 * * * *", postJobs);
 
 bot.command("start", (ctx) => {
   ctx.reply("SkillClarity Job Bot is live.");

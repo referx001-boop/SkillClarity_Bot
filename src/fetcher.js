@@ -1,6 +1,5 @@
 const axios = require("axios");
 
-// Track posted jobs to avoid duplicates
 const postedJobIds = new Set();
 
 async function fetchRemotiveJobs() {
@@ -11,7 +10,7 @@ async function fetchRemotiveJobs() {
     });
 
     const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 20 * 60 * 60 * 1000; // 20 minutes ago
+    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
 
     return jobs
       .filter((job) => {
@@ -43,7 +42,7 @@ async function fetchArbeitnowJobs() {
     });
 
     const jobs = res.data.data || [];
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000; // 24 hours ago
+    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
 
     return jobs
       .filter((job) => {
@@ -68,18 +67,127 @@ async function fetchArbeitnowJobs() {
   }
 }
 
+async function fetchHimalayasJobs() {
+  try {
+    const res = await axios.get("https://himalayas.app/jobs/api", {
+      params: { limit: 50 },
+      timeout: 10000,
+    });
+
+    const jobs = res.data.jobs || [];
+    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
+
+    return jobs
+      .filter((job) => {
+        const posted = new Date(job.createdAt).getTime();
+        return posted >= cutoff && !postedJobIds.has(`himalayas-${job.id}`);
+      })
+      .map((job) => ({
+        id: `himalayas-${job.id}`,
+        title: job.title,
+        company: job.companyName,
+        location: "Remote",
+        salary: job.salaryCurrency
+          ? `${job.salaryMin} - ${job.salaryMax} ${job.salaryCurrency}`
+          : null,
+        tags: job.categories || [],
+        description: job.description?.slice(0, 300) || "",
+        url: job.applicationLink || `https://himalayas.app/jobs/${job.slug}`,
+        source: "Himalayas",
+        postedAt: job.createdAt,
+      }));
+  } catch (err) {
+    console.error("[Himalayas] Fetch error:", err.message);
+    return [];
+  }
+}
+
+async function fetchTheMuseJobs() {
+  try {
+    const res = await axios.get("https://www.themuse.com/api/public/jobs", {
+      params: { page: 0, descended: true },
+      timeout: 10000,
+    });
+
+    const jobs = res.data.results || [];
+    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
+
+    return jobs
+      .filter((job) => {
+        const posted = new Date(job.publication_date).getTime();
+        return posted >= cutoff && !postedJobIds.has(`muse-${job.id}`);
+      })
+      .map((job) => ({
+        id: `muse-${job.id}`,
+        title: job.name,
+        company: job.company?.name || "Unknown",
+        location: job.locations?.map((l) => l.name).join(", ") || "Remote",
+        salary: null,
+        tags: job.categories?.map((c) => c.name) || [],
+        description: job.contents?.slice(0, 300) || "",
+        url: job.refs?.landing_page || "",
+        source: "The Muse",
+        postedAt: job.publication_date,
+      }));
+  } catch (err) {
+    console.error("[TheMuse] Fetch error:", err.message);
+    return [];
+  }
+}
+
+async function fetchJoobleJobs() {
+  try {
+    const res = await axios.post(
+      "https://jooble.org/api/",
+      { keywords: "remote developer designer product manager", location: "" },
+      { timeout: 10000 },
+    );
+
+    const jobs = res.data.jobs || [];
+    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
+
+    return jobs
+      .filter((job) => {
+        const posted = new Date(job.updated).getTime();
+        return posted >= cutoff && !postedJobIds.has(`jooble-${job.id}`);
+      })
+      .map((job) => ({
+        id: `jooble-${job.id}`,
+        title: job.title,
+        company: job.company || "Unknown",
+        location: job.location || "Remote",
+        salary: job.salary || null,
+        tags: [],
+        description: job.snippet?.slice(0, 300) || "",
+        url: job.link,
+        source: "Jooble",
+        postedAt: job.updated,
+      }));
+  } catch (err) {
+    console.error("[Jooble] Fetch error:", err.message);
+    return [];
+  }
+}
+
 async function fetchAllJobs() {
-  const [remotive, arbeitnow] = await Promise.all([
+  const [remotive, arbeitnow, himalayas, themuse, jooble] = await Promise.all([
     fetchRemotiveJobs(),
     fetchArbeitnowJobs(),
+    fetchHimalayasJobs(),
+    fetchTheMuseJobs(),
+    fetchJoobleJobs(),
   ]);
 
-  const allJobs = [...remotive, ...arbeitnow];
+  const allJobs = [
+    ...remotive,
+    ...arbeitnow,
+    ...himalayas,
+    ...themuse,
+    ...jooble,
+  ];
 
-  // Mark all as posted
   allJobs.forEach((job) => postedJobIds.add(job.id));
 
-  // Keep set from growing too large
   if (postedJobIds.size > 2000) {
     const entries = [...postedJobIds];
     entries.slice(0, 500).forEach((id) => postedJobIds.delete(id));
