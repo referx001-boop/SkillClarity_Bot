@@ -24,6 +24,7 @@ const TOPIC_THREAD_IDS = {
 };
 
 const CHANNEL_ID = process.env.CHANNEL_ID;
+const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME; // e.g. skillclarityjobsng
 
 async function postJobs() {
   console.log(`[${new Date().toISOString()}] Fetching jobs...`);
@@ -57,10 +58,52 @@ async function postJobs() {
 cron.schedule("*/2 * * * *", postJobs);
 
 bot.command("start", (ctx) => {
-  ctx.reply("SkillClarity Job Bot is live.");
+  ctx.reply("SkillClarity Job Bot is live. Fresh remote jobs posted every few minutes.");
 });
 
-bot.launch({ allowedUpdates: ["message", "channel_post"] }).then(() => {
+bot.command("status", (ctx) => {
+  ctx.reply("Bot is running.");
+});
+
+// Join request handler
+bot.on("chat_join_request", async (ctx) => {
+  const userId = ctx.chatJoinRequest.from.id;
+  const chatId = ctx.chatJoinRequest.chat.id;
+
+  try {
+    // Check if user is subscribed to the channel
+    const member = await bot.telegram.getChatMember(
+      `@${CHANNEL_USERNAME}`,
+      userId
+    );
+
+    const isSubscribed = ["member", "administrator", "creator"].includes(
+      member.status
+    );
+
+    if (isSubscribed) {
+      // Approve the request
+      await bot.telegram.approveChatJoinRequest(chatId, userId);
+      await bot.telegram.sendMessage(
+        userId,
+        "✅ You have been approved to join SkillClarity Jobs group. Welcome!"
+      );
+    } else {
+      // Reject and tell them to join the channel first
+      await bot.telegram.declineChatJoinRequest(chatId, userId);
+      await bot.telegram.sendMessage(
+        userId,
+        `❌ To join the group you must first subscribe to our channel.\n\n👉 Join here: t.me/${CHANNEL_USERNAME}\n\nThen click the group link again.`
+      );
+    }
+  } catch (err) {
+    console.error("[Join request error]", err.message);
+    // Approve anyway if check fails to avoid blocking legitimate users
+    await bot.telegram.approveChatJoinRequest(chatId, userId);
+  }
+});
+
+bot.launch({ allowedUpdates: ["message", "channel_post", "chat_join_request"] }).then(() => {
   console.log("SkillClarity bot started.");
   postJobs();
 });
