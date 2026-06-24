@@ -1,15 +1,18 @@
 function formatJobMessage(job, categoryLabel) {
-  const salary = job.salary ? `\n💰 *Salary:* ${job.salary}` : "";
+  const title = cleanText(job.title);
+  const company = cleanText(job.company);
+  const location = cleanText(job.location);
+  const salary = job.salary ? `\n💰 Salary: ${cleanText(job.salary)}` : "";
   const tags =
-    job.tags.length > 0
+    job.tags && job.tags.length > 0
       ? `\n🏷 ${job.tags.slice(0, 4).map((t) => `#${t.replace(/\s+/g, "")}`).join(" ")}`
       : "";
 
   return (
     `🚨 *New ${categoryLabel} Job*\n\n` +
-    `*${escapeMarkdown(job.title)}*\n` +
-    `🏢 ${escapeMarkdown(job.company)}\n` +
-    `📍 ${escapeMarkdown(job.location)}` +
+    `*${title}*\n` +
+    `🏢 ${company}\n` +
+    `📍 ${location}` +
     salary +
     tags +
     `\n\n🔗 [Apply Now](${job.url})\n` +
@@ -17,9 +20,17 @@ function formatJobMessage(job, categoryLabel) {
   );
 }
 
-function escapeMarkdown(text) {
+function cleanText(text) {
   if (!text) return "";
-  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
+  // Remove special markdown characters that break formatting
+  return text
+    .replace(/[\\]/g, "")
+    .replace(/[_*[\]()~`>#+\-=|{}.!]/g, (match) => {
+      // Keep hyphens in normal text, escape only markdown special chars
+      if (match === "-") return match;
+      return "";
+    })
+    .trim();
 }
 
 module.exports = { formatJobMessage };
