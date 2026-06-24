@@ -1,88 +1,125 @@
-const CATEGORIES = {
-  frontend: {
-    label: "🖥 Frontend",
-    keywords: ["frontend", "front-end", "react", "vue", "angular", "next.js", "svelte", "html", "css", "javascript", "typescript", "ui developer", "web developer", "front end"],
-  },
-  backend: {
-    label: "⚙️ Backend",
-    keywords: ["backend", "back-end", "node.js", "python", "django", "fastapi", "express", "php", "laravel", "java", "spring", "golang", "rust", "api developer", "back end", "software engineer", "software developer"],
-  },
-  fullstack: {
-    label: "🔁 Fullstack",
-    keywords: ["full stack", "fullstack", "full-stack", "mern", "mean", "lamp"],
-  },
-  design: {
-    label: "🎨 UI/UX Design",
-    keywords: ["ui/ux", "ui designer", "ux designer", "product designer", "figma", "graphic designer", "web designer", "visual designer", "interaction designer", "ux researcher", "creative designer", "brand designer"],
-  },
-  mobile: {
-    label: "📱 Mobile",
-    keywords: ["mobile developer", "android", "ios", "flutter", "react native", "kotlin", "swift", "mobile engineer"],
-  },
-  devops: {
-    label: "☁️ DevOps & Cloud",
-    keywords: ["devops", "cloud", "aws", "gcp", "azure", "kubernetes", "docker", "sre", "platform engineer", "infrastructure", "ci/cd", "site reliability", "cloud engineer"],
-  },
-  data: {
-    label: "📊 Data & AI",
-    keywords: ["data scientist", "data analyst", "machine learning", "ai engineer", "data engineer", "nlp", "llm", "deep learning", "business intelligence", "bi analyst", "analytics engineer", "power bi", "tableau", "sql analyst", "data science", "artificial intelligence"],
-  },
-  pm: {
-    label: "📋 Product Management",
-    keywords: ["product manager", "product owner", "technical pm", "associate pm", "senior pm", "head of product", "product lead", "product strategist", "agile product", "project manager", "scrum master", "program manager"],
-  },
-  cybersecurity: {
-    label: "🔐 Cybersecurity",
-    keywords: ["cybersecurity", "cyber security", "information security", "infosec", "penetration tester", "pentester", "soc analyst", "security engineer", "security analyst", "ethical hacker", "vulnerability", "devsecops", "cloud security", "network security"],
-  },
-  blockchain: {
-    label: "⛓ Blockchain & Web3",
-    keywords: ["blockchain", "web3", "solidity", "smart contract", "defi", "nft", "crypto developer", "ethereum", "rust blockchain", "substrate"],
-  },
-  writing: {
-    label: "✍️ Technical Writing",
-    keywords: ["technical writer", "content writer", "copywriter", "documentation", "developer advocate", "devrel", "content strategist", "blog writer", "seo writer", "content creator", "editor"],
-  },
-  support: {
-    label: "🛎 Tech Support & QA",
-    keywords: ["qa engineer", "quality assurance", "test engineer", "manual tester", "automation tester", "customer success", "technical support", "help desk", "it support", "customer support", "support engineer"],
-  },
-  engineering: {
-    label: "🔧 Engineering",
-    keywords: ["engineer", "engineering", "ingenieur", "techniker", "mechanical", "electrical", "civil", "structural", "construction", "manufacturing", "industrial"],
-  },
-  marketing: {
-    label: "📣 Marketing & Growth",
-    keywords: ["marketing", "growth", "seo", "sem", "social media", "digital marketing", "brand", "campaign", "advertising", "communications", "pr ", "public relations", "email marketing"],
-  },
-  business: {
-    label: "💼 Business & Operations",
-    keywords: ["business development", "operations", "strategy", "consulting", "management", "founder", "executive", "director", "analyst", "finance", "accounting", "sales", "account manager"],
-  },
-  freelance: {
-    label: "🌍 Freelance & Remote",
-    keywords: ["freelance", "contract", "part-time", "remote work", "gig", "working student", "intern", "internship", "trainee"],
-  },
-};
+const axios = require("axios");
 
-function detectCategory(job) {
-  const text = `${job.title} ${job.description || ""} ${(job.tags || []).join(" ")}`.toLowerCase();
+const postedJobIds = new Set();
 
-  // Priority order matters - more specific first
-  const priorityOrder = [
-    "frontend", "backend", "fullstack", "mobile", "devops",
-    "data", "cybersecurity", "blockchain", "design", "pm",
-    "writing", "support", "engineering", "marketing", "business", "freelance"
-  ];
+async function fetchRemotiveJobs() {
+  try {
+    const res = await axios.get("https://remotive.com/api/remote-jobs", {
+      params: { limit: 50 },
+      timeout: 10000,
+    });
 
-  for (const key of priorityOrder) {
-    const category = CATEGORIES[key];
-    if (category.keywords.some((kw) => text.includes(kw))) {
-      return key;
-    }
+    const jobs = res.data.jobs || [];
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+
+    return jobs
+      .filter((job) => {
+        const posted = new Date(job.publication_date).getTime();
+        return posted >= cutoff && !postedJobIds.has(`remotive-${job.id}`);
+      })
+      .map((job) => ({
+        id: `remotive-${job.id}`,
+        title: job.title,
+        company: job.company_name,
+        location: job.candidate_required_location || "Remote",
+        salary: job.salary || null,
+        tags: job.tags || [],
+        description: job.description?.slice(0, 300) || "",
+        url: job.url,
+        source: "Remotive",
+        postedAt: job.publication_date,
+      }));
+  } catch (err) {
+    console.error("[Remotive] Fetch error:", err.message);
+    return [];
   }
-
-  return "freelance";
 }
 
-module.exports = { CATEGORIES, detectCategory };
+async function fetchHimalayasJobs() {
+  try {
+    const res = await axios.get("https://himalayas.app/jobs/api", {
+      params: { limit: 50 },
+      timeout: 10000,
+    });
+
+    const jobs = res.data.jobs || [];
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+
+    return jobs
+      .filter((job) => {
+        const posted = new Date(job.createdAt).getTime();
+        return posted >= cutoff && !postedJobIds.has(`himalayas-${job.id}`);
+      })
+      .map((job) => ({
+        id: `himalayas-${job.id}`,
+        title: job.title,
+        company: job.companyName,
+        location: "Remote",
+        salary: job.salaryCurrency
+          ? `${job.salaryMin} - ${job.salaryMax} ${job.salaryCurrency}`
+          : null,
+        tags: job.categories || [],
+        description: job.description?.slice(0, 300) || "",
+        url: job.applicationLink || `https://himalayas.app/jobs/${job.slug}`,
+        source: "Himalayas",
+        postedAt: job.createdAt,
+      }));
+  } catch (err) {
+    console.error("[Himalayas] Fetch error:", err.message);
+    return [];
+  }
+}
+
+async function fetchTheMuseJobs() {
+  try {
+    const res = await axios.get("https://www.themuse.com/api/public/jobs", {
+      params: { page: 0, descended: true },
+      timeout: 10000,
+    });
+
+    const jobs = res.data.results || [];
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+
+    return jobs
+      .filter((job) => {
+        const posted = new Date(job.publication_date).getTime();
+        return posted >= cutoff && !postedJobIds.has(`muse-${job.id}`);
+      })
+      .map((job) => ({
+        id: `muse-${job.id}`,
+        title: job.name,
+        company: job.company?.name || "Unknown",
+        location: job.locations?.map((l) => l.name).join(", ") || "Remote",
+        salary: null,
+        tags: job.categories?.map((c) => c.name) || [],
+        description: job.contents?.slice(0, 300) || "",
+        url: job.refs?.landing_page || "",
+        source: "The Muse",
+        postedAt: job.publication_date,
+      }));
+  } catch (err) {
+    console.error("[TheMuse] Fetch error:", err.message);
+    return [];
+  }
+}
+
+async function fetchAllJobs() {
+  const [remotive, himalayas, themuse] = await Promise.all([
+    fetchRemotiveJobs(),
+    fetchHimalayasJobs(),
+    fetchTheMuseJobs(),
+  ]);
+
+  const allJobs = [...remotive, ...himalayas, ...themuse];
+
+  allJobs.forEach((job) => postedJobIds.add(job.id));
+
+  if (postedJobIds.size > 2000) {
+    const entries = [...postedJobIds];
+    entries.slice(0, 500).forEach((id) => postedJobIds.delete(id));
+  }
+
+  return allJobs;
+}
+
+module.exports = { fetchAllJobs };
