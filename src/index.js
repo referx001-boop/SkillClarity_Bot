@@ -56,14 +56,12 @@ async function postJobs() {
   }
 }
 
-cron.schedule("*/2 * * * *", postJobs);
+cron.schedule("*/15 * * * *", postJobs);
 
-// Start command - general
 bot.command("start", async (ctx) => {
   const payload = ctx.message.text.split(" ")[1];
 
   if (payload === "join") {
-    // They came from the channel join link
     await ctx.reply(
       `👋 Hey! Welcome to SkillClarity Jobs.\n\n` +
       `Before joining the group, you need to subscribe to our channel first.\n\n` +
@@ -85,10 +83,9 @@ bot.command("start", async (ctx) => {
 });
 
 bot.command("status", (ctx) => {
-  ctx.reply("Bot is running. Jobs fetched every 2 minutes.");
+  ctx.reply("Bot is running. Jobs fetched every 15 minutes.");
 });
 
-// Join request handler
 bot.on("chat_join_request", async (ctx) => {
   const userId = ctx.chatJoinRequest.from.id;
   const chatId = ctx.chatJoinRequest.chat.id;
