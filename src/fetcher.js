@@ -10,7 +10,7 @@ async function fetchRemotiveJobs() {
     });
 
     const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 20 * 60 * 1000;
 
     return jobs
       .filter((job) => {
@@ -42,7 +42,7 @@ async function fetchArbeitnowJobs() {
     });
 
     const jobs = res.data.data || [];
-    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 20 * 60 * 1000;
 
     return jobs
       .filter((job) => {
@@ -75,7 +75,7 @@ async function fetchHimalayasJobs() {
     });
 
     const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 20 * 60 * 1000;
 
     return jobs
       .filter((job) => {
@@ -110,7 +110,7 @@ async function fetchTheMuseJobs() {
     });
 
     const jobs = res.data.results || [];
-    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
+    const cutoff = Date.now() - 20 * 60 * 1000;
 
     return jobs
       .filter((job) => {
@@ -135,56 +135,15 @@ async function fetchTheMuseJobs() {
   }
 }
 
-async function fetchJoobleJobs() {
-  try {
-    const res = await axios.post(
-      "https://jooble.org/api/",
-      { keywords: "remote developer designer product manager", location: "" },
-      { timeout: 10000 },
-    );
-
-    const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 3 * 60 * 1000; // 3 minutes ago = Date.now() - 20 * 60 * 1000;
-
-    return jobs
-      .filter((job) => {
-        const posted = new Date(job.updated).getTime();
-        return posted >= cutoff && !postedJobIds.has(`jooble-${job.id}`);
-      })
-      .map((job) => ({
-        id: `jooble-${job.id}`,
-        title: job.title,
-        company: job.company || "Unknown",
-        location: job.location || "Remote",
-        salary: job.salary || null,
-        tags: [],
-        description: job.snippet?.slice(0, 300) || "",
-        url: job.link,
-        source: "Jooble",
-        postedAt: job.updated,
-      }));
-  } catch (err) {
-    console.error("[Jooble] Fetch error:", err.message);
-    return [];
-  }
-}
-
 async function fetchAllJobs() {
-  const [remotive, arbeitnow, himalayas, themuse, jooble] = await Promise.all([
+  const [remotive, arbeitnow, himalayas, themuse] = await Promise.all([
     fetchRemotiveJobs(),
     fetchArbeitnowJobs(),
     fetchHimalayasJobs(),
     fetchTheMuseJobs(),
-    fetchJoobleJobs(),
   ]);
 
-  const allJobs = [
-    ...remotive,
-    ...arbeitnow,
-    ...himalayas,
-    ...themuse,
-    ...jooble,
-  ];
+  const allJobs = [...remotive, ...arbeitnow, ...himalayas, ...themuse];
 
   allJobs.forEach((job) => postedJobIds.add(job.id));
 
@@ -194,19 +153,6 @@ async function fetchAllJobs() {
   }
 
   return allJobs;
-}
-
-async function fetchNigerianJobs() {
-  try {
-    const res = await axios.get(
-      "https://www.linkedin.com/jobs/search/?location=Nigeria&f_TP=1&f_JT=F%2CC%2CP%2CT&f_WT=2",
-      { timeout: 10000 }
-    );
-    // LinkedIn blocks scraping
-  } catch (err) {
-    console.error("[Nigeria] Fetch error:", err.message);
-    return [];
-  }
 }
 
 module.exports = { fetchAllJobs };
