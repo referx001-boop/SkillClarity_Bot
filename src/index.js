@@ -24,7 +24,8 @@ const TOPIC_THREAD_IDS = {
 };
 
 const CHANNEL_ID = process.env.CHANNEL_ID;
-const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME; // e.g. skillclarityjobsng
+const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
+const GROUP_INVITE_LINK = process.env.GROUP_INVITE_LINK;
 
 async function postJobs() {
   console.log(`[${new Date().toISOString()}] Fetching jobs...`);
@@ -57,21 +58,43 @@ async function postJobs() {
 
 cron.schedule("*/2 * * * *", postJobs);
 
-bot.command("start", (ctx) => {
-  ctx.reply("SkillClarity Job Bot is live. Fresh remote jobs posted every few minutes.");
+// Start command - general
+bot.command("start", async (ctx) => {
+  const payload = ctx.message.text.split(" ")[1];
+
+  if (payload === "join") {
+    // They came from the channel join link
+    await ctx.reply(
+      `👋 Hey! Welcome to SkillClarity Jobs.\n\n` +
+      `Before joining the group, you need to subscribe to our channel first.\n\n` +
+      `Here is why: The channel broadcasts fresh remote job alerts every few minutes. ` +
+      `The group is where the community discusses, shares wins, and supports each other.\n\n` +
+      `👉 Step 1: Subscribe to the channel here: t.me/${CHANNEL_USERNAME}\n` +
+      `👉 Step 2: Come back and click the group link: ${GROUP_INVITE_LINK}\n` +
+      `👉 Step 3: Request to join and we will approve you instantly.\n\n` +
+      `See you inside. 🚀`
+    );
+  } else {
+    await ctx.reply(
+      `👋 Welcome to SkillClarity Jobs Bot.\n\n` +
+      `We post fresh remote tech jobs straight to Telegram every few minutes.\n\n` +
+      `👉 Subscribe to our channel: t.me/${CHANNEL_USERNAME}\n\n` +
+      `See you inside. 🚀`
+    );
+  }
 });
 
 bot.command("status", (ctx) => {
-  ctx.reply("Bot is running.");
+  ctx.reply("Bot is running. Jobs fetched every 2 minutes.");
 });
 
 // Join request handler
 bot.on("chat_join_request", async (ctx) => {
   const userId = ctx.chatJoinRequest.from.id;
   const chatId = ctx.chatJoinRequest.chat.id;
+  const firstName = ctx.chatJoinRequest.from.first_name || "there";
 
   try {
-    // Check if user is subscribed to the channel
     const member = await bot.telegram.getChatMember(
       `@${CHANNEL_USERNAME}`,
       userId
@@ -82,28 +105,36 @@ bot.on("chat_join_request", async (ctx) => {
     );
 
     if (isSubscribed) {
-      // Approve the request
       await bot.telegram.approveChatJoinRequest(chatId, userId);
-      await bot.telegram.sendMessage(
-        userId,
-        "✅ You have been approved to join SkillClarity Jobs group. Welcome!"
-      );
+      try {
+        await bot.telegram.sendMessage(
+          userId,
+          `✅ Welcome to SkillClarity Jobs group, ${firstName}!\n\n` +
+          `Join the topics that match your skill and start applying. Fresh jobs drop every few minutes.\n\n` +
+          `Good luck. 🚀`
+        );
+      } catch (e) {}
     } else {
-      // Reject and tell them to join the channel first
       await bot.telegram.declineChatJoinRequest(chatId, userId);
-      await bot.telegram.sendMessage(
-        userId,
-        `❌ To join the group you must first subscribe to our channel.\n\n👉 Join here: t.me/${CHANNEL_USERNAME}\n\nThen click the group link again.`
-      );
+      try {
+        await bot.telegram.sendMessage(
+          userId,
+          `❌ Sorry ${firstName}, you need to subscribe to our channel first.\n\n` +
+          `👉 Step 1: Subscribe here: t.me/${CHANNEL_USERNAME}\n` +
+          `👉 Step 2: Then click the group link again: ${GROUP_INVITE_LINK}\n\n` +
+          `We will approve you instantly once you are subscribed. 🚀`
+        );
+      } catch (e) {}
     }
   } catch (err) {
     console.error("[Join request error]", err.message);
-    // Approve anyway if check fails to avoid blocking legitimate users
     await bot.telegram.approveChatJoinRequest(chatId, userId);
   }
 });
 
-bot.launch({ allowedUpdates: ["message", "channel_post", "chat_join_request"] }).then(() => {
+bot.launch({
+  allowedUpdates: ["message", "channel_post", "chat_join_request"],
+}).then(() => {
   console.log("SkillClarity bot started.");
   postJobs();
 });
