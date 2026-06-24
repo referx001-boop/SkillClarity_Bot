@@ -196,4 +196,17 @@ async function fetchAllJobs() {
   return allJobs;
 }
 
+async function fetchNigerianJobs() {
+  try {
+    const res = await axios.get(
+      "https://www.linkedin.com/jobs/search/?location=Nigeria&f_TP=1&f_JT=F%2CC%2CP%2CT&f_WT=2",
+      { timeout: 10000 }
+    );
+    // LinkedIn blocks scraping
+  } catch (err) {
+    console.error("[Nigeria] Fetch error:", err.message);
+    return [];
+  }
+}
+
 module.exports = { fetchAllJobs };
