@@ -60,30 +60,6 @@ bot.command("start", (ctx) => {
   ctx.reply("SkillClarity Job Bot is live.");
 });
 
-// Thread ID detector - catches ALL message types
-bot.on(["message", "channel_post"], async (ctx) => {
-  try {
-    const msg = ctx.message || ctx.channelPost;
-    const threadId = msg.message_thread_id;
-    const chatId = msg.chat.id;
-
-    console.log(`[MSG] chat: ${chatId} | thread: ${threadId} | text: ${msg.text}`);
-
-    if (threadId) {
-      await bot.telegram.sendMessage(chatId, 
-        `Chat ID: ${chatId}\nThread ID: ${threadId}\n\nPaste these in your .env file.`,
-        { message_thread_id: threadId }
-      );
-    } else {
-      await bot.telegram.sendMessage(chatId,
-        `Chat ID: ${chatId}\nThis is the General topic (no thread ID needed).`
-      );
-    }
-  } catch (err) {
-    console.error("[Reply error]", err.message);
-  }
-});
-
 bot.launch({ allowedUpdates: ["message", "channel_post"] }).then(() => {
   console.log("SkillClarity bot started.");
   postJobs();
