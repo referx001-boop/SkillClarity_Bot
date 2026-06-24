@@ -56,3 +56,4 @@ npm run dev
 - Data & AI
 - Freelance & Remote
 # SkillClarityBot
+# SkillClarity_Bot
