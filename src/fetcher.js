@@ -12,6 +12,33 @@ const rssParser = new Parser({
 const postedJobIds = new Set();
 
 const CUTOFF_HOURS = 24;
+const fs = require("fs");
+
+const CACHE_FILE = "/tmp/posted_job_ids.json";
+const postedJobIds = new Set();
+
+// Load persisted IDs on startup
+function loadCache() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8"));
+      data.forEach((id) => postedJobIds.add(id));
+      console.log(`[Cache] Loaded ${postedJobIds.size} posted job IDs`);
+    }
+  } catch (err) {
+    console.error("[Cache] Load error:", err.message);
+  }
+}
+
+function saveCache() {
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify([...postedJobIds]));
+  } catch (err) {
+    console.error("[Cache] Save error:", err.message);
+  }
+}
+
+loadCache();
 
 function getCutoff() {
   return Date.now() - CUTOFF_HOURS * 60 * 60 * 1000;
