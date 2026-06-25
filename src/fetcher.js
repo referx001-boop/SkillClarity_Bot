@@ -1,6 +1,21 @@
 const axios = require("axios");
+const Parser = require("rss-parser");
+
+const rssParser = new Parser({
+  timeout: 10000,
+  headers: {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  },
+});
 
 const postedJobIds = new Set();
+
+const CUTOFF_HOURS = 24;
+
+function getCutoff() {
+  return Date.now() - CUTOFF_HOURS * 60 * 60 * 1000;
+}
 
 function isEnglish(text) {
   if (!text) return true;
@@ -32,6 +47,8 @@ function isEnglish(text) {
   return germanCount < 2;
 }
 
+// ─── Remotive (JSON API) ────────────────────────────────────────────────────
+
 async function fetchRemotiveJobs() {
   try {
     const res = await axios.get("https://remotive.com/api/remote-jobs", {
@@ -44,7 +61,7 @@ async function fetchRemotiveJobs() {
     });
 
     const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const cutoff = getCutoff();
 
     return jobs
       .filter((job) => {
@@ -69,6 +86,53 @@ async function fetchRemotiveJobs() {
   }
 }
 
+// ─── We Work Remotely (RSS) ─────────────────────────────────────────────────
+
+async function fetchWWRJobs() {
+  try {
+    const feed = await rssParser.parseURL(
+      "https://weworkremotely.com/remote-jobs.rss",
+    );
+
+    const cutoff = getCutoff();
+
+    return feed.items
+      .filter((item) => {
+        const posted = new Date(item.pubDate).getTime();
+        const id = `wwr-${encodeURIComponent(item.link)}`;
+        return posted >= cutoff && !postedJobIds.has(id);
+      })
+      .map((item) => {
+        // WWR title format: "Company: Job Title"
+        const [companyRaw, ...titleParts] = (item.title || "").split(":");
+        const title = titleParts.join(":").trim() || item.title;
+        const company = companyRaw.trim();
+
+        // Extract region from content if available
+        const regionMatch = (item.content || "").match(/\[([^\]]+)\]/);
+        const location = regionMatch ? regionMatch[1] : "Remote";
+
+        return {
+          id: `wwr-${encodeURIComponent(item.link)}`,
+          title,
+          company,
+          location,
+          salary: null,
+          tags: item.categories || [],
+          description: (item.contentSnippet || "").slice(0, 300),
+          url: item.link,
+          source: "We Work Remotely",
+          postedAt: item.pubDate,
+        };
+      });
+  } catch (err) {
+    console.error("[WWR] Fetch error:", err.message);
+    return [];
+  }
+}
+
+// ─── Arbeitnow (JSON API) ───────────────────────────────────────────────────
+
 async function fetchArbeitnowJobs() {
   try {
     const res = await axios.get("https://www.arbeitnow.com/api/job-board-api", {
@@ -80,7 +144,7 @@ async function fetchArbeitnowJobs() {
     });
 
     const jobs = res.data.data || [];
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const cutoff = getCutoff();
 
     return jobs
       .filter((job) => {
@@ -114,117 +178,7 @@ async function fetchArbeitnowJobs() {
   }
 }
 
-async function fetchHimalayasJobs() {
-  try {
-    const res = await axios.get("https://himalayas.app/jobs/api", {
-      params: { limit: 20 },
-      timeout: 10000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-    });
-
-    const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-
-    return jobs
-      .filter((job) => {
-        const posted = new Date(job.createdAt).getTime();
-        return posted >= cutoff && !postedJobIds.has(`himalayas-${job.id}`);
-      })
-      .map((job) => ({
-        id: `himalayas-${job.id}`,
-        title: job.title,
-        company: job.companyName,
-        location: "Remote",
-        salary: job.salaryCurrency
-          ? `${job.salaryMin} - ${job.salaryMax} ${job.salaryCurrency}`
-          : null,
-        tags: job.categories || [],
-        description: job.description?.slice(0, 300) || "",
-        url: job.applicationLink || `https://himalayas.app/jobs/${job.slug}`,
-        source: "Himalayas",
-        postedAt: job.createdAt,
-      }));
-  } catch (err) {
-    console.error("[Himalayas] Fetch error:", err.message);
-    return [];
-  }
-}
-
-async function fetchTheMuseJobs() {
-  try {
-    const res = await axios.get("https://www.themuse.com/api/public/jobs", {
-      params: { page: 0, descended: true },
-      timeout: 10000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-    });
-
-    const jobs = res.data.results || [];
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-
-    return jobs
-      .filter((job) => {
-        const posted = new Date(job.publication_date).getTime();
-        return posted >= cutoff && !postedJobIds.has(`muse-${job.id}`);
-      })
-      .map((job) => ({
-        id: `muse-${job.id}`,
-        title: job.name,
-        company: job.company?.name || "Unknown",
-        location: job.locations?.map((l) => l.name).join(", ") || "Remote",
-        salary: null,
-        tags: job.categories?.map((c) => c.name) || [],
-        description: job.contents?.slice(0, 300) || "",
-        url: job.refs?.landing_page || "",
-        source: "The Muse",
-        postedAt: job.publication_date,
-      }));
-  } catch (err) {
-    console.error("[TheMuse] Fetch error:", err.message);
-    return [];
-  }
-}
-
-async function fetchRemoteOKJobs() {
-  try {
-    const res = await axios.get("https://remoteok.com/api", {
-      timeout: 10000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-    });
-
-    const jobs = (res.data || []).filter((j) => j.id);
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-
-    return jobs
-      .filter((job) => {
-        const posted = job.epoch * 1000;
-        return posted >= cutoff && !postedJobIds.has(`remoteok-${job.id}`);
-      })
-      .map((job) => ({
-        id: `remoteok-${job.id}`,
-        title: job.position,
-        company: job.company,
-        location: "Remote",
-        salary: job.salary || null,
-        tags: job.tags || [],
-        description: job.description?.slice(0, 300) || "",
-        url: job.url,
-        source: "RemoteOK",
-        postedAt: new Date(job.epoch * 1000).toISOString(),
-      }));
-  } catch (err) {
-    console.error("[RemoteOK] Fetch error:", err.message);
-    return [];
-  }
-}
+// ─── Jobicy (JSON API) ──────────────────────────────────────────────────────
 
 async function fetchJobicyJobs() {
   try {
@@ -238,7 +192,7 @@ async function fetchJobicyJobs() {
     });
 
     const jobs = res.data.jobs || [];
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const cutoff = getCutoff();
 
     return jobs
       .filter((job) => {
@@ -265,36 +219,124 @@ async function fetchJobicyJobs() {
   }
 }
 
+// ─── Remote.co (RSS) ────────────────────────────────────────────────────────
+
+async function fetchRemoteCoJobs() {
+  try {
+    const feed = await rssParser.parseURL(
+      "https://remote.co/remote-jobs/feed/",
+    );
+
+    const cutoff = getCutoff();
+
+    return feed.items
+      .filter((item) => {
+        const posted = new Date(item.pubDate).getTime();
+        const id = `remoteco-${encodeURIComponent(item.link)}`;
+        return posted >= cutoff && !postedJobIds.has(id);
+      })
+      .map((item) => {
+        // remote.co titles are usually plain job titles
+        const title = (item.title || "").trim();
+        const company =
+          item.creator ||
+          item["dc:creator"] ||
+          (item.content || "").match(/at ([^<\n]+)/i)?.[1]?.trim() ||
+          "Unknown";
+
+        return {
+          id: `remoteco-${encodeURIComponent(item.link)}`,
+          title,
+          company,
+          location: "Remote",
+          salary: null,
+          tags: item.categories || [],
+          description: (item.contentSnippet || "").slice(0, 300),
+          url: item.link,
+          source: "Remote.co",
+          postedAt: item.pubDate,
+        };
+      });
+  } catch (err) {
+    console.error("[Remote.co] Fetch error:", err.message);
+    return [];
+  }
+}
+
+// ─── Remotive RSS (backup, catches jobs the API misses) ─────────────────────
+
+async function fetchRemotiveRSSJobs() {
+  try {
+    const feed = await rssParser.parseURL(
+      "https://remotive.com/remote-jobs/feed/all",
+    );
+
+    const cutoff = getCutoff();
+
+    return feed.items
+      .filter((item) => {
+        const posted = new Date(item.pubDate).getTime();
+        // Use a different prefix so it doesn't collide with fetchRemotiveJobs
+        const id = `remotive-rss-${encodeURIComponent(item.link)}`;
+        return posted >= cutoff && !postedJobIds.has(id);
+      })
+      .map((item) => {
+        const [companyRaw, ...titleParts] = (item.title || "").split(" - ");
+        const title = titleParts.join(" - ").trim() || item.title;
+        const company = companyRaw.trim();
+
+        return {
+          id: `remotive-rss-${encodeURIComponent(item.link)}`,
+          title,
+          company,
+          location: "Remote",
+          salary: null,
+          tags: item.categories || [],
+          description: (item.contentSnippet || "").slice(0, 300),
+          url: item.link,
+          source: "Remotive",
+          postedAt: item.pubDate,
+        };
+      });
+  } catch (err) {
+    console.error("[Remotive RSS] Fetch error:", err.message);
+    return [];
+  }
+}
+
+// ─── Aggregate ───────────────────────────────────────────────────────────────
+
 async function fetchAllJobs() {
-  // Clear cache once it hits 500 so jobs recirculate
-  if (postedJobIds.size > 500) {
-    postedJobIds.clear();
-    console.log("[Cache] Cleared posted jobs cache");
+  if (postedJobIds.size > 1000) {
+    // Prune oldest 500 instead of clearing everything
+    const entries = [...postedJobIds];
+    entries.slice(0, 500).forEach((id) => postedJobIds.delete(id));
+    console.log("[Cache] Pruned 500 oldest job IDs");
   }
 
-  const [remotive, arbeitnow, himalayas, themuse, remoteok, jobicy] =
+  const [remotive, remotiveRSS, wwr, arbeitnow, jobicy, remoteco] =
     await Promise.all([
       fetchRemotiveJobs(),
+      fetchRemotiveRSSJobs(),
+      fetchWWRJobs(),
       fetchArbeitnowJobs(),
-      fetchHimalayasJobs(),
-      fetchTheMuseJobs(),
-      fetchRemoteOKJobs(),
       fetchJobicyJobs(),
+      fetchRemoteCoJobs(),
     ]);
 
   const allJobs = [
     ...remotive,
+    ...remotiveRSS,
+    ...wwr,
     ...arbeitnow,
-    ...himalayas,
-    ...themuse,
-    ...remoteok,
     ...jobicy,
+    ...remoteco,
   ];
 
   allJobs.forEach((job) => postedJobIds.add(job.id));
 
   console.log(
-    `[Sources] Remotive:${remotive.length} Arbeitnow:${arbeitnow.length} Himalayas:${himalayas.length} TheMuse:${themuse.length} RemoteOK:${remoteok.length} Jobicy:${jobicy.length}`,
+    `[Sources] Remotive:${remotive.length} RemotiveRSS:${remotiveRSS.length} WWR:${wwr.length} Arbeitnow:${arbeitnow.length} Jobicy:${jobicy.length} RemoteCo:${remoteco.length}`,
   );
 
   return allJobs;
