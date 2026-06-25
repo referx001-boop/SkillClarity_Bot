@@ -268,7 +268,7 @@ async function fetchRemoteCoJobs() {
 async function fetchRemotiveRSSJobs() {
   try {
     const feed = await rssParser.parseURL(
-      "https://remotive.com/remote-jobs/feed/all",
+      "https://remotive.com/remote-jobs/feed",
     );
 
     const cutoff = getCutoff();
