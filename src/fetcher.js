@@ -1,4 +1,5 @@
 const axios = require("axios");
+const fs = require("fs");
 const Parser = require("rss-parser");
 
 const rssParser = new Parser({
@@ -9,15 +10,11 @@ const rssParser = new Parser({
   },
 });
 
-const postedJobIds = new Set();
-
-const CUTOFF_HOURS = 24;
-const fs = require("fs");
+// ─── Cache (persists across restarts, resets on redeploy) ───────────────────
 
 const CACHE_FILE = "/tmp/posted_job_ids.json";
 const postedJobIds = new Set();
 
-// Load persisted IDs on startup
 function loadCache() {
   try {
     if (fs.existsSync(CACHE_FILE)) {
@@ -40,6 +37,10 @@ function saveCache() {
 
 loadCache();
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const CUTOFF_HOURS = 24;
+
 function getCutoff() {
   return Date.now() - CUTOFF_HOURS * 60 * 60 * 1000;
 }
@@ -55,6 +56,8 @@ function isEnglish(text) {
   const germanCount = words.filter((w) => germanWords.includes(w)).length;
   return germanCount < 2;
 }
+
+// ─── Remotive (JSON API) ─────────────────────────────────────────────────────
 
 async function fetchRemotiveJobs() {
   try {
@@ -93,6 +96,8 @@ async function fetchRemotiveJobs() {
   }
 }
 
+// ─── Remotive (RSS backup) ───────────────────────────────────────────────────
+
 async function fetchRemotiveRSSJobs() {
   try {
     const feed = await rssParser.parseURL("https://remotive.com/remote-jobs/feed");
@@ -127,6 +132,8 @@ async function fetchRemotiveRSSJobs() {
     return [];
   }
 }
+
+// ─── We Work Remotely (RSS) ──────────────────────────────────────────────────
 
 async function fetchWWRJobs() {
   try {
@@ -164,6 +171,8 @@ async function fetchWWRJobs() {
     return [];
   }
 }
+
+// ─── Arbeitnow (JSON API) ────────────────────────────────────────────────────
 
 async function fetchArbeitnowJobs() {
   try {
@@ -210,6 +219,8 @@ async function fetchArbeitnowJobs() {
   }
 }
 
+// ─── Jobicy (JSON API) ───────────────────────────────────────────────────────
+
 async function fetchJobicyJobs() {
   try {
     const res = await axios.get("https://jobicy.com/api/v2/remote-jobs", {
@@ -248,6 +259,8 @@ async function fetchJobicyJobs() {
     return [];
   }
 }
+
+// ─── Adzuna (JSON API) ───────────────────────────────────────────────────────
 
 async function fetchAdzunaJobs() {
   const appId = process.env.ADZUNA_APP_ID;
@@ -307,6 +320,8 @@ async function fetchAdzunaJobs() {
     }));
 }
 
+// ─── Aggregate ───────────────────────────────────────────────────────────────
+
 async function fetchAllJobs() {
   if (postedJobIds.size > 1000) {
     const entries = [...postedJobIds];
@@ -334,6 +349,7 @@ async function fetchAllJobs() {
   ];
 
   allJobs.forEach((job) => postedJobIds.add(job.id));
+  saveCache();
 
   console.log(
     `[Sources] Remotive:${remotive.length} RemotiveRSS:${remotiveRSS.length} WWR:${wwr.length} Arbeitnow:${arbeitnow.length} Jobicy:${jobicy.length} Adzuna:${adzuna.length}`
