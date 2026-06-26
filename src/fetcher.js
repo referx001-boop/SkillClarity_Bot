@@ -272,7 +272,7 @@ async function fetchAdzunaJobs() {
   }
 
   const cutoff = getCutoff();
-  const countries = ["gb", "us", "ca"];
+  const countries = ["us"];
 
   const requests = countries.map((country) =>
     axios
