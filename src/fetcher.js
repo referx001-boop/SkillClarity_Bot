@@ -282,7 +282,6 @@ async function fetchAdzunaJobs() {
           app_key: appKey,
           results_per_page: 50,
           what: "remote developer engineer designer",
-          where: "remote",
           sort_by: "date",
           content_type: "application/json",
         },
