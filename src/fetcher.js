@@ -48,9 +48,27 @@ function getCutoff() {
 function isEnglish(text) {
   if (!text) return true;
   const germanWords = [
-    "und", "der", "die", "das", "für", "mit", "von", "auf", "ist", "bei",
-    "zur", "zum", "des", "dem", "ein", "eine", "nicht", "sich", "werden",
-    "wurde", "durch",
+    "und",
+    "der",
+    "die",
+    "das",
+    "für",
+    "mit",
+    "von",
+    "auf",
+    "ist",
+    "bei",
+    "zur",
+    "zum",
+    "des",
+    "dem",
+    "ein",
+    "eine",
+    "nicht",
+    "sich",
+    "werden",
+    "wurde",
+    "durch",
   ];
   const words = text.toLowerCase().split(/\s+/);
   const germanCount = words.filter((w) => germanWords.includes(w)).length;
@@ -100,7 +118,9 @@ async function fetchRemotiveJobs() {
 
 async function fetchRemotiveRSSJobs() {
   try {
-    const feed = await rssParser.parseURL("https://remotive.com/remote-jobs/feed");
+    const feed = await rssParser.parseURL(
+      "https://remotive.com/remote-jobs/feed",
+    );
     const cutoff = getCutoff();
 
     return feed.items
@@ -137,7 +157,9 @@ async function fetchRemotiveRSSJobs() {
 
 async function fetchWWRJobs() {
   try {
-    const feed = await rssParser.parseURL("https://weworkremotely.com/remote-jobs.rss");
+    const feed = await rssParser.parseURL(
+      "https://weworkremotely.com/remote-jobs.rss",
+    );
     const cutoff = getCutoff();
 
     return feed.items
@@ -281,17 +303,19 @@ async function fetchAdzunaJobs() {
           app_id: appId,
           app_key: appKey,
           results_per_page: 50,
-          what: "remote developer engineer designer",
+          what: "developer engineer designer",
           sort_by: "date",
-          content_type: "application/json",
         },
         timeout: 10000,
       })
       .then((res) => res.data.results || [])
       .catch((err) => {
-        console.error(`[Adzuna/${country.toUpperCase()}] Fetch error:`, err.message);
+        console.error(
+          `[Adzuna/${country.toUpperCase()}] Fetch error:`,
+          err.message,
+        );
         return [];
-      })
+      }),
   );
 
   const results = await Promise.all(requests);
@@ -351,7 +375,7 @@ async function fetchAllJobs() {
   saveCache();
 
   console.log(
-    `[Sources] Remotive:${remotive.length} RemotiveRSS:${remotiveRSS.length} WWR:${wwr.length} Arbeitnow:${arbeitnow.length} Jobicy:${jobicy.length} Adzuna:${adzuna.length}`
+    `[Sources] Remotive:${remotive.length} RemotiveRSS:${remotiveRSS.length} WWR:${wwr.length} Arbeitnow:${arbeitnow.length} Jobicy:${jobicy.length} Adzuna:${adzuna.length}`,
   );
 
   return allJobs;
